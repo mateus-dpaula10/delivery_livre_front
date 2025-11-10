@@ -1,0 +1,14 @@
+# Ignorar backend Laravel
+../back/
+../back/*
+!../back/.env
+
+# Ignorar node_modules, logs e arquivos locais
+node_modules/
+*.log
+.git
+.gitignore
+
+# Ignorar tudo relacionado a storage e links simbólicos
+../back/storage/
+../back/public/storage/
