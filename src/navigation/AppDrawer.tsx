@@ -11,6 +11,7 @@ import ClientOrders from "../screens/client/ClientOrders";
 import ClientProfile from "../screens/client/ClientProfile";
 import StoreOrders from "../screens/store/StoreOrders";
 import StoreDrivers from "../screens/store/StoreDrivers";
+import AdminDashboard from "../screens/admin/AdminDashboard";
 
 const Drawer = createDrawerNavigator();
 
@@ -20,7 +21,8 @@ export default function AppDrawer() {
 
   const screens: Record<string, { name: string; component: any; title: string }[]> = {
     admin: [
-      { name: "ManageUsers", component: ManageUsers, title: "Gerenciar Usuários" }
+      { name: "ManageUsers", component: ManageUsers, title: "Gerenciar Usuários" },
+      { name: "AdminDashboard", component: AdminDashboard, title: "Dashboard Administração" },
     ],
     store: [
       { name: "StoreProducts", component: StoreProducts, title: "Produtos" },

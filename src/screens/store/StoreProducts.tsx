@@ -238,7 +238,7 @@ export default function StoreProducts() {
     }
   }, [isFocused]);
 
-  const getImageUrl = (path: string) => `https://apideliverylivre.com.br/storage/${path}`;
+  const getImageUrl = (path: string) => `https://infrasonic-fibular-pat.ngrok-free.dev/storage/${path}`;
   const { width } = useWindowDimensions();
   const numColumns = width < 500 ? 1 : width < 900 ? 2 : 3;
 

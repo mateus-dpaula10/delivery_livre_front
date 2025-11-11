@@ -262,7 +262,7 @@ export default function ClientCart() {
       {item.product.images?.length > 0 && (
         <Image
           source={{
-            uri: `https://apideliverylivre.com.br/storage/${item.product.images[0].image_path}`,
+            uri: `https://infrasonic-fibular-pat.ngrok-free.dev/storage/${item.product.images[0].image_path}`,
           }}
           style={styles.image}
         />

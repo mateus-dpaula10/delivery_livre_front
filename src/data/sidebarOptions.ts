@@ -19,7 +19,7 @@ export const sidebarOptions: Record<string, { label: string; screen: string; ico
         { label: 'Perfil', screen: 'DeliveryProfile', icon: User }
     ],
     admin: [
-        // { label: 'Painel', screen: 'AdminDashboard', icon: Home },
+        { label: 'Painel', screen: 'AdminDashboard', icon: Home },
         { label: 'Lojas', screen: 'ManageUsers', icon: ClipboardList }
     ]
 };

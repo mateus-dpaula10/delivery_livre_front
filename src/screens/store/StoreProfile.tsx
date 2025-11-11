@@ -135,7 +135,7 @@ export default function StoreProfile() {
 
       if (company.logo) {
         setLogo({
-          uri: `https://apideliverylivre.com.br/storage/${company.logo}`,
+          uri: `https://infrasonic-fibular-pat.ngrok-free.dev/storage/${company.logo}`,
           name: 'logo.jpg',
           type: 'image/jpeg',
           isNew: false

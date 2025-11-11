@@ -166,7 +166,7 @@ export default function ClientOrders() {
         {product.images?.[0] && (
           <Image
             source={{
-              uri: `https://apideliverylivre.com.br/storage/${product.images[0].image_path}`,
+              uri: `https://infrasonic-fibular-pat.ngrok-free.dev/storage/${product.images[0].image_path}`,
             }}
             style={styles.itemImage}
             resizeMode="cover"

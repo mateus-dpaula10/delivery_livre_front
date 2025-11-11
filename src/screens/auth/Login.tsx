@@ -17,6 +17,7 @@ import { useNavigation } from "@react-navigation/native";
 import { useAuth } from "../../contexts/AuthContext";
 import api from "../../services/api";
 import logo from "../../../assets/Delivery Livre - Logo horizontal - azul  sem fundo.png"; 
+import { Ionicons } from "@expo/vector-icons";
 
 export default function LoginScreen() {
   const { login } = useAuth();
@@ -58,32 +59,34 @@ export default function LoginScreen() {
     >
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
         <View style={styles.container}>
-          <Image source={logo} style={styles.logo} resizeMode="contain" />
-
-          <TextInput
-            style={styles.input}
-            placeholder="Email"
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
-            autoCapitalize="none"
-          />
+          <Image source={logo} style={styles.logo} resizeMode="contain" />          
 
           <View style={styles.passwordContainer}>
             <TextInput
-              style={[styles.input, { flex: 1 }]}
+              style={styles.input}
+              placeholder="Email"
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+            />
+          </View>
+
+          <View style={styles.passwordContainer}>
+            <TextInput
+              style={styles.input}
               placeholder="Senha"
               value={password}
               onChangeText={setPassword}
               secureTextEntry={!showPassword}
             />
-            <TouchableOpacity
-              style={styles.showPasswordButton}
-              onPress={() => setShowPassword(!showPassword)}
-            >
-              <Text style={styles.showPasswordText}>
-                {showPassword ? "Ocultar" : "Mostrar"}
-              </Text>
+            <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
+              <Ionicons
+                name={showPassword ? "eye-off" : "eye"}
+                size={20}
+                color="#555"
+                style={{ marginHorizontal: 8 }}
+              />
             </TouchableOpacity>
           </View>
 
@@ -120,8 +123,7 @@ const styles = StyleSheet.create({
     alignSelf: "center",
     marginBottom: 0,
   },
-  input: {
-    height: 50,
+  inputContainer: {
     borderWidth: 1,
     borderColor: "#ccc",
     borderRadius: 8,
@@ -129,10 +131,22 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     backgroundColor: "#fff",
   },
+  input: {
+    flex: 1,                  
+    height: 50,
+    borderWidth: 0,           
+    paddingHorizontal: 8,     
+    backgroundColor: "#fff",
+  },
   passwordContainer: {
     flexDirection: "row",
     alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 8,
+    paddingHorizontal: 8,
     marginBottom: 16,
+    backgroundColor: "#fff",
   },
   showPasswordButton: {
     marginLeft: 8,

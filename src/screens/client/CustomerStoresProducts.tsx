@@ -167,7 +167,7 @@ export default function CustomerStoresProducts({ route }: any) {
         {product.images.length > 0 && (
           <View style={{ position: 'relative', width: '100%', height: 200 }}>
             <Image
-              source={{ uri: `https://apideliverylivre.com.br/storage/${product.images[currentIndex].image_path}` }}
+              source={{ uri: `https://infrasonic-fibular-pat.ngrok-free.dev/storage/${product.images[currentIndex].image_path}` }}
               style={{ width: '100%', height: '100%' }}
               resizeMode="cover"
             />
