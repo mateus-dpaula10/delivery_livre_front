@@ -116,7 +116,7 @@ export default function StoreOrders() {
       {item.product.images?.[0] && (
         <Image
           source={{
-            uri: `https://infrasonic-fibular-pat.ngrok-free.dev/storage/${item.product.images[0].image_path}`,
+            uri: `https://apideliverylivre.com.br/storage/${item.product.images[0].image_path}`,
           }}
           style={styles.itemImage}
           resizeMode="cover"

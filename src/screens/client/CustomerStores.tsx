@@ -39,19 +39,19 @@ export default function CustomerStores({ navigation }: Props) {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
   const categories = [
-    { name: 'Supermercado', image: 'https://infrasonic-fibular-pat.ngrok-free.dev/categories/supermercado.jpg' },
-    { name: 'Padaria', image: 'https://infrasonic-fibular-pat.ngrok-free.dev/categories/padaria.jpg' },
-    { name: 'Restaurante', image: 'https://infrasonic-fibular-pat.ngrok-free.dev/categories/restaurante.jpg' },
-    { name: 'Bebidas', image: 'https://infrasonic-fibular-pat.ngrok-free.dev/categories/bebidas.jpg' },
-    { name: 'Doces e Sobremesas', image: 'https://infrasonic-fibular-pat.ngrok-free.dev/categories/sobremesas.jpg' },
-    { name: 'Farmácia', image: 'https://infrasonic-fibular-pat.ngrok-free.dev/categories/farmacia.jpg' },
-    { name: 'Pet Shop', image: 'https://infrasonic-fibular-pat.ngrok-free.dev/categories/petshop.jpg' },
-    { name: 'Moda e Acessórios', image: 'https://infrasonic-fibular-pat.ngrok-free.dev/categories/moda.jpg' },
-    { name: 'Eletrônicos', image: 'https://infrasonic-fibular-pat.ngrok-free.dev/categories/eletronicos.jpg' },
-    { name: 'Casa e Decoração', image: 'https://infrasonic-fibular-pat.ngrok-free.dev/categories/casa_decoracao.jpg' },
-    { name: 'Saúde e Beleza', image: 'https://infrasonic-fibular-pat.ngrok-free.dev/categories/beleza.jpg' },
-    { name: 'Esporte e Lazer', image: 'https://infrasonic-fibular-pat.ngrok-free.dev/categories/esportes.jpg' },
-    { name: 'Livraria', image: 'https://infrasonic-fibular-pat.ngrok-free.dev/categories/livraria.jpg' },
+    { name: 'Supermercado', image: 'https://apideliverylivre.com.br/categories/supermercado.jpg' },
+    { name: 'Padaria', image: 'https://apideliverylivre.com.br/categories/padaria.jpg' },
+    { name: 'Restaurante', image: 'https://apideliverylivre.com.br/categories/restaurante.jpg' },
+    { name: 'Bebidas', image: 'https://apideliverylivre.com.br/categories/bebidas.jpg' },
+    { name: 'Doces e Sobremesas', image: 'https://apideliverylivre.com.br/categories/sobremesas.jpg' },
+    { name: 'Farmácia', image: 'https://apideliverylivre.com.br/categories/farmacia.jpg' },
+    { name: 'Pet Shop', image: 'https://apideliverylivre.com.br/categories/petshop.jpg' },
+    { name: 'Moda e Acessórios', image: 'https://apideliverylivre.com.br/categories/moda.jpg' },
+    { name: 'Eletrônicos', image: 'https://apideliverylivre.com.br/categories/eletronicos.jpg' },
+    { name: 'Casa e Decoração', image: 'https://apideliverylivre.com.br/categories/casa_decoracao.jpg' },
+    { name: 'Saúde e Beleza', image: 'https://apideliverylivre.com.br/categories/beleza.jpg' },
+    { name: 'Esporte e Lazer', image: 'https://apideliverylivre.com.br/categories/esportes.jpg' },
+    { name: 'Livraria', image: 'https://apideliverylivre.com.br/categories/livraria.jpg' },
   ];
 
   const fetchStores = async () => {
@@ -125,7 +125,7 @@ export default function CustomerStores({ navigation }: Props) {
       <View key={store.id} style={[styles.storeCard, !openNow && { opacity: 0.5 }]}>
         {store.logo && ( 
           <Image 
-            source={{ uri: `https://infrasonic-fibular-pat.ngrok-free.dev/storage/${store.logo.replace(/^\/+/, '')}` }} 
+            source={{ uri: `https://apideliverylivre.com.br/storage/${store.logo.replace(/^\/+/, '')}` }} 
             style={styles.storeLogo} 
           />
         )}

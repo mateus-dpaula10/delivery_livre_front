@@ -12,6 +12,7 @@ import ClientProfile from "../screens/client/ClientProfile";
 import StoreOrders from "../screens/store/StoreOrders";
 import StoreDrivers from "../screens/store/StoreDrivers";
 import AdminDashboard from "../screens/admin/AdminDashboard";
+import StoreDashboard from "../screens/store/StoreDashboard";
 
 const Drawer = createDrawerNavigator();
 
@@ -25,6 +26,7 @@ export default function AppDrawer() {
       { name: "AdminDashboard", component: AdminDashboard, title: "Dashboard Administração" },
     ],
     store: [
+      { name: "StoreDashboard", component: StoreDashboard, title: "Dashboard Administração" },
       { name: "StoreProducts", component: StoreProducts, title: "Produtos" },
       { name: "StoreProfile", component: StoreProfile, title: "Perfil da Loja" },
       { name: "StoreOrders", component: StoreOrders, title: "Pedidos" },

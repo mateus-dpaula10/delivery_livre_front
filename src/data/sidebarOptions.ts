@@ -8,6 +8,7 @@ export const sidebarOptions: Record<string, { label: string; screen: string; ico
         { label: 'Perfil', screen: 'ClientProfile', icon: User }
     ],
     store: [
+        { label: 'Painel', screen: 'AdminDashboard', icon: Home },
         { label: 'Produtos', screen: 'StoreProducts', icon: ShoppingCart },
         { label: 'Pedidos Recebidos', screen: 'StoreOrders', icon: Truck },
         { label: 'Motoristas Parceiros', screen: 'StoreDrivers', icon: Users },

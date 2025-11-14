@@ -5,6 +5,7 @@ import { useIsFocused } from "@react-navigation/native";
 import { Alert, Button, FlatList, Image, StyleSheet, Text, TextInput, View } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { Picker } from "@react-native-picker/picker";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 type Banner = {
   id?: number;
@@ -64,21 +65,55 @@ export default function AdminDashboard() {
     try {
       if (!banner.title || !banner.image_url)
         return Alert.alert("Preencha título e imagem!");
+      
+      const token = await AsyncStorage.getItem("@token");
+      if (!token) return;
 
-      const payload = { ...banner };
+      const formData = new FormData();
+      formData.append("title", banner.title);
+      if (banner.target_company_id)
+        formData.append("target_company_id", String(banner.target_company_id));
+
       if (banner.id) {
-        await api.put(`/banners/${banner.id}`, payload);
-        Alert.alert("Sucesso", "Banner atualizado!");
-      } else {
-        await api.post("/banners", payload);
-        Alert.alert("Sucesso", "Banner criado!");
+        formData.append("_method", "PUT");
       }
+
+      if (banner.image_url.startsWith("file://")) {
+        const filename = banner.image_url.split("/").pop()!;
+        const ext = filename.split(".").pop();
+        const type = ext ? `image/${ext}` : "image/jpeg";
+
+        formData.append("image", {
+          uri: banner.image_url,
+          name: filename,
+          type,
+        } as any);
+      }
+
+      const endpoint = banner.id
+        ? `/banners/${banner.id}/update`
+        : `/banners`;
+
+      await api.post(endpoint, formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      Alert.alert(
+        "Sucesso",
+        banner.id ? "Banner atualizado!" : "Banner criado!"
+      );
 
       setBanner({ title: "", image_url: "", target_company_id: null });
       loadBanners();
-    } catch (err) {
-      console.error("Erro ao salvar banner", err);
-      Alert.alert("Erro", "Não foi possível salvar o banner.");
+    } catch (err: any) {
+      console.error("Erro ao salvar banner:", err.response?.data || err.message);
+      Alert.alert(
+        "Erro",
+        err.response?.data?.message || "Não foi possível salvar o banner."
+      );
     }
   }
 
@@ -89,7 +124,7 @@ export default function AdminDashboard() {
   async function handleDelete(id?: number) {
     try {
       if (!id) return;
-      await api.delete(`/banners/${id}`);
+      await api.delete(`/banners/${id}/delete`);
       Alert.alert("Sucesso", "Banner excluído!");
       loadBanners();
     } catch (err) {

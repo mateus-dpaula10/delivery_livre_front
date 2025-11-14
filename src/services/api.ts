@@ -2,7 +2,7 @@ import axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const api = axios.create({
-  baseURL: "https://infrasonic-fibular-pat.ngrok-free.dev/api"
+  baseURL: "https://apideliverylivre.com.br/api"
 });
 
 api.interceptors.request.use(
