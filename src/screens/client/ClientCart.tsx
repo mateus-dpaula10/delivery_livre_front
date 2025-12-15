@@ -8,20 +8,24 @@ import {
   Image,
   TouchableOpacity,
   Alert,
-  StyleSheet
+  StyleSheet,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../../services/api';
 import { useIsFocused } from '@react-navigation/native';
 
+/* =====================
+   TYPES
+===================== */
 type ProductImage = { id: number; product_id: number; image_path: string };
 type ProductVariation = { id: number; type: string; value: string };
+
 type Product = {
   id: number;
   name: string;
   description?: string;
-  price: number;
+  price: number | string;
   stock_quantity: number;
   company_id: number;
   images: ProductImage[];
@@ -31,10 +35,10 @@ type CartItem = {
   id: number;
   product: Product;
   quantity: number;
-  price: number;
-  subtotal: number;
+  price: number | string;
+  subtotal: number | string;
   variations: ProductVariation[];
-  variation_key?: string; 
+  variation_key?: string;
 };
 
 type Address = {
@@ -46,52 +50,48 @@ type Address = {
   city: string;
   state: string;
   number?: string;
-  complement?: string;
-  note?: string;
 };
 
 type Company = {
   id: number;
-  legal_name: string;
   final_name: string;
-  cnpj: string;
-  phone: string;
-  address: string;
-  plan: string | null;
-  active: boolean;
-  email: string;
-  category: string | null;
-  status: string | null;
-  logo: string | null;
-  delivery_fee: number;
-  delivery_radius: number;
-  opening_hours: string | null;
   free_shipping: boolean;
   first_purchase_discount_store: boolean;
   first_purchase_discount_store_value: number | null;
   first_purchase_discount_app: boolean;
   first_purchase_discount_app_value: number | null;
-  created_at?: string;
-  updated_at?: string;
 };
 
+/* =====================
+   HELPERS
+===================== */
+const formatPrice = (value: any) =>
+  `R$ ${Number(value || 0).toFixed(2).replace('.', ',')}`;
+
+/* =====================
+   COMPONENT
+===================== */
 export default function ClientCart() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [company, setCompany] = useState<Company | null>(null);
-  const isFocused = useIsFocused();
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [selectedAddress, setSelectedAddress] = useState<Address | null>(null);
   const [deliveryInfo, setDeliveryInfo] = useState<{ fee: number; distance: number } | null>(null);
   const [discountValue, setDiscountValue] = useState(0);
-  const [discountType, setDiscountType] = useState<string | null>(null);
+  const [discountType, setDiscountType] = useState<'app' | 'store' | null>(null);
+
+  const isFocused = useIsFocused();
 
   useEffect(() => {
     if (isFocused) {
       fetchCart();
       fetchAddresses();
-    } 
+    }
   }, [isFocused]);
 
+  /* =====================
+     API CALLS
+  ===================== */
   const fetchCart = async () => {
     try {
       const token = await AsyncStorage.getItem('@token');
@@ -119,36 +119,8 @@ export default function ClientCart() {
         setCart([]);
         setCompany(null);
       }
-    } catch (err) {
-      console.error('Erro ao carregar carrinho:', err);
+    } catch {
       Alert.alert('Erro', 'Não foi possível carregar o carrinho');
-    }
-  };
-
-  const calculateDelivery = async (address: Address) => {
-    if (!address || !company || !cart.length) return;
-
-    try {
-      if (company?.free_shipping) {
-        setDeliveryInfo({ fee: 0, distance: 0 });
-        return;
-      }
-
-      const token = await AsyncStorage.getItem('@token');
-      if (!token) return;
-
-      const { data } = await api.post(
-        '/delivery/calc',
-        {
-          address: `${address.street}, ${address.number || ''} - ${address.neighborhood}, ${address.city} - ${address.state}, ${address.cep}`,
-        },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-
-      setDeliveryInfo({ fee: data.fee, distance: data.distance });
-    } catch (err) {
-      console.error('Erro ao calcular frete:', err);
-      setDeliveryInfo(null);
     }
   };
 
@@ -162,101 +134,93 @@ export default function ClientCart() {
       });
 
       setAddresses(data.addresses || []);
-      
       if (data.addresses?.length) {
         setSelectedAddress(data.addresses[0]);
         calculateDelivery(data.addresses[0]);
       }
-    } catch (err) {
-      console.error('Erro ao buscar endereços:', err);
+    } catch {}
+  };
+
+  const calculateDelivery = async (address: Address) => {
+    if (!company || !address) return;
+
+    if (company.free_shipping) {
+      setDeliveryInfo({ fee: 0, distance: 0 });
+      return;
+    }
+
+    try {
+      const token = await AsyncStorage.getItem('@token');
+      if (!token) return;
+
+      const { data } = await api.post(
+        '/delivery/calc',
+        {
+          address: `${address.street}, ${address.number || ''} - ${address.neighborhood}, ${address.city}`,
+        },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      setDeliveryInfo({
+        fee: Number(data.fee || 0),
+        distance: Number(data.distance || 0),
+      });
+    } catch {
+      setDeliveryInfo(null);
     }
   };
 
+  /* =====================
+     CART ACTIONS
+  ===================== */
   const removeItem = async (itemId: number) => {
     try {
       const token = await AsyncStorage.getItem('@token');
       await api.delete(`/cart/items/${itemId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      setCart(prev => prev.filter(c => c.id !== itemId));
-    } catch (err) {
-      console.error(err);
+      setCart(prev => prev.filter(i => i.id !== itemId));
+    } catch {
       Alert.alert('Erro', 'Não foi possível remover o produto');
     }
   };
 
   const incrementQuantity = async (itemId: number) => {
-    try {
-      const token = await AsyncStorage.getItem('@token');
-      await api.put(`/cart/items/${itemId}/increment`, {}, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      fetchCart();
-    } catch (err) {
-      console.error('Erro ao aumentar quantidade:', err);
-    }
+    const token = await AsyncStorage.getItem('@token');
+    await api.put(`/cart/items/${itemId}/increment`, {}, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    fetchCart();
   };
 
   const decrementQuantity = async (itemId: number) => {
-    try {
-      const token = await AsyncStorage.getItem('@token');
-      await api.put(`/cart/items/${itemId}/decrement`, {}, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      fetchCart();
-    } catch (err) {
-      console.error('Erro ao diminuir quantidade:', err);
-    }
+    const token = await AsyncStorage.getItem('@token');
+    await api.put(`/cart/items/${itemId}/decrement`, {}, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    fetchCart();
   };
+
+  /* =====================
+     TOTALS
+  ===================== */
+  const getItemsTotal = () =>
+    cart.reduce((sum, i) => sum + Number(i.subtotal || 0), 0);
 
   const getTotal = () => {
-    const itemsTotal = cart.reduce((sum, item) => sum + item.subtotal, 0);
+    const itemsTotal = getItemsTotal();
+    let discount = 0;
 
-    let discountAmount = 0;
-    if (company) {
-      if (company.first_purchase_discount_store) {
-        discountAmount = itemsTotal * ((company.first_purchase_discount_store_value || 0) / 100);
-      } else if (company.first_purchase_discount_app) {
-        discountAmount = itemsTotal * ((company.first_purchase_discount_app_value || 0) / 100);
-      }
+    if (discountValue > 0) {
+      discount = itemsTotal * (discountValue / 100);
     }
 
-    const fee = deliveryInfo ? deliveryInfo.fee : 0;
-
-    const total = itemsTotal - discountAmount + fee;
-    return total;
+    return itemsTotal - discount + Number(deliveryInfo?.fee || 0);
   };
 
-  const checkout = async () => {
-    if (!cart.length) return Alert.alert('Aviso', 'Seu carrinho está vazio');
-
-    if (!selectedAddress) return Alert.alert('Aviso', 'Selecione um endereço acima. Caso não apareça, adicione um ao seu perfil.');
-
-    try {
-      const token = await AsyncStorage.getItem('@token');
-      const total = getTotal();
-
-      await api.post(
-        '/cart/checkout',
-        {
-          address_id: selectedAddress.id,
-          total,
-          items: cart.map(c => ({
-            product_id: c.product.id,
-            quantity: c.quantity,
-            variation_ids: c.variations.map(v => v.id),
-          })),
-        },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      Alert.alert('Sucesso', 'Pedido criado com sucesso');
-      setCart([]);
-    } catch (err) {
-      console.error(err);
-      Alert.alert('Erro', 'Erro no checkout');
-    }
-  };
-
+  /* =====================
+     RENDER ITEM
+  ===================== */
   const CartItemCard = ({ item }: { item: CartItem }) => (
     <View style={styles.card}>
       {item.product.images?.length > 0 && (
@@ -272,21 +236,15 @@ export default function ClientCart() {
         <View style={styles.cardHeader}>
           <Text style={styles.productName}>{item.product.name}</Text>
           <TouchableOpacity onPress={() => removeItem(item.id)}>
-            <Ionicons name="trash-outline" size={22} color="red" />
+            <Ionicons name="trash-outline" size={22} color="#e53935" />
           </TouchableOpacity>
         </View>
-
-        <Text numberOfLines={2} style={styles.description}>
-          {item.product.description}
-        </Text>
 
         {item.variation_key && (
           <Text style={styles.variationKey}>{item.variation_key}</Text>
         )}
 
-        <Text style={styles.price}>
-          R$ {Number(item.price).toFixed(2).replace('.', ',')}
-        </Text>
+        <Text style={styles.price}>{formatPrice(item.price)}</Text>
 
         <View style={styles.qtyRow}>
           <TouchableOpacity
@@ -295,8 +253,8 @@ export default function ClientCart() {
           >
             <Ionicons
               name="remove-circle-outline"
-              size={24}
-              color={item.quantity <= 1 ? '#ccc' : 'gray'}
+              size={26}
+              color={item.quantity <= 1 ? '#ccc' : '#555'}
             />
           </TouchableOpacity>
 
@@ -308,10 +266,8 @@ export default function ClientCart() {
           >
             <Ionicons
               name="add-circle-outline"
-              size={24}
-              color={
-                item.quantity >= item.product.stock_quantity ? '#ccc' : 'blue'
-              }
+              size={26}
+              color={item.quantity >= item.product.stock_quantity ? '#ccc' : '#007bff'}
             />
           </TouchableOpacity>
         </View>
@@ -319,74 +275,42 @@ export default function ClientCart() {
     </View>
   );
 
+  /* =====================
+     RENDER
+  ===================== */
   return (
     <KeyboardAvoidingView
       style={{ flex: 1, padding: 16 }}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 80 : 0}
     >
       <Text style={styles.title}>Meu Carrinho</Text>
 
-      {addresses.length > 0 && cart.length > 0 && (
-        <View style={{ marginBottom: 16 }}>
-          <Text style={{ fontWeight: 'bold', marginBottom: 6 }}>Selecione o endereço de entrega:</Text>
-          {addresses.map(addr => (
-            <TouchableOpacity
-              key={addr.id}
-              onPress={() => {
-                setSelectedAddress(addr);
-                calculateDelivery(addr);
-              }}
-              style={{
-                padding: 10,
-                borderWidth: 1,
-                borderColor: selectedAddress?.id === addr.id ? '#007bff' : '#ccc',
-                borderRadius: 8,
-                marginBottom: 6,
-              }}
-            >
-              <Text>{`${addr.street}, ${addr.number || ''} - ${addr.neighborhood}, ${addr.city} - ${addr.state}, ${addr.cep}`}</Text>
-            </TouchableOpacity>
-          ))}
-          {deliveryInfo && (
-            <Text style={{ marginTop: 6, fontWeight: 'bold' }}>
-              {company?.free_shipping
-                ? 'Frete: Grátis'
-                : `Frete: R$ ${deliveryInfo.fee.toFixed(2).replace('.', ',')} (${deliveryInfo.distance.toFixed(2)} km)`
-              }
-            </Text>
-          )}
-        </View>
-      )}
-
       {cart.length === 0 ? (
-        <Text style={styles.emptyCart}>Seu carrinho está vazio</Text>
+        <Text style={styles.empty}>Seu carrinho está vazio</Text>
       ) : (
         <FlatList
           data={cart}
-          keyExtractor={item => item.id.toString()}
-          keyboardShouldPersistTaps="handled"
+          keyExtractor={i => i.id.toString()}
           renderItem={({ item }) => <CartItemCard item={item} />}
           ListFooterComponent={
             <View style={styles.footer}>
-              <View style={styles.footerRow}>
-                <Text>Subtotal: R$ {cart.reduce((s, c) => s + c.subtotal, 0).toFixed(2).replace('.', ',')}</Text>
+              <Text>Subtotal: {formatPrice(getItemsTotal())}</Text>
 
-                {discountValue > 0 && (
-                  <Text style={{ color: 'green' }}>
-                    🎉 {discountValue}% de desconto ({discountType === 'app' ? 'App' : 'Loja'})
-                  </Text>
-                )}
-
-                {deliveryInfo && (
-                  <Text>Frete: R$ {deliveryInfo.fee.toFixed(2).replace('.', ',')}</Text>
-                )}
-
-                <Text style={styles.totalLabel}>
-                  Total: R$ {getTotal().toFixed(2).replace('.', ',')}
+              {discountValue > 0 && (
+                <Text style={styles.discount}>
+                  🎉 {discountValue}% de desconto ({discountType === 'app' ? 'App' : 'Loja'})
                 </Text>
-              </View>
-              <TouchableOpacity style={styles.checkoutBtn} onPress={checkout}>
+              )}
+
+              {deliveryInfo && (
+                <Text>
+                  Frete: {deliveryInfo.fee === 0 ? 'Grátis' : formatPrice(deliveryInfo.fee)}
+                </Text>
+              )}
+
+              <Text style={styles.total}>Total: {formatPrice(getTotal())}</Text>
+
+              <TouchableOpacity style={styles.checkoutBtn} onPress={() => Alert.alert('Checkout')}>
                 <Text style={styles.checkoutText}>Prosseguir para pagamento</Text>
               </TouchableOpacity>
             </View>
@@ -397,45 +321,43 @@ export default function ClientCart() {
   );
 }
 
+/* =====================
+   STYLES
+===================== */
 const styles = StyleSheet.create({
+  title: { fontSize: 22, fontWeight: 'bold', marginBottom: 12 },
+  empty: { textAlign: 'center', marginTop: 40, fontSize: 16 },
+
   card: {
     flexDirection: 'row',
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    marginBottom: 12,
     backgroundColor: '#fff',
+    borderRadius: 10,
+    marginBottom: 12,
+    elevation: 2,
     overflow: 'hidden',
   },
-  image: { width: 100, height: '100%', resizeMode: 'cover' },
+  image: { width: 100, height: '100%' },
   cardContent: { flex: 1, padding: 10 },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
+
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between' },
   productName: { fontWeight: 'bold', fontSize: 16 },
-  description: { fontSize: 13, color: '#666', marginVertical: 4 },
-  variationKey: { fontSize: 13, color: '#007bff', marginBottom: 4 },
-  price: { fontSize: 14, color: '#333' },
-  qtyRow: { flexDirection: 'row', alignItems: 'center', marginTop: 6 },
-  qty: { marginHorizontal: 10, fontSize: 16, fontWeight: 'bold' },
-  title: { fontSize: 20, fontWeight: 'bold', marginBottom: 12 },
-  emptyCart: { textAlign: 'center', marginTop: 40, fontSize: 16, color: '#555' },
-  footer: {
-    borderTopWidth: 1,
-    borderColor: '#ddd',
-    paddingVertical: 16,
-    marginTop: 12,
-  },
-  footerRow: { flexDirection: 'column', justifyContent: 'space-between', marginBottom: 12, gap: '10' },
-  totalLabel: { fontWeight: 'bold', fontSize: 16 },
-  totalValue: { fontWeight: 'bold', fontSize: 16 },
+
+  variationKey: { color: '#007bff', marginVertical: 4 },
+  price: { fontWeight: 'bold', marginTop: 4 },
+
+  qtyRow: { flexDirection: 'row', alignItems: 'center', marginTop: 8 },
+  qty: { marginHorizontal: 12, fontSize: 16, fontWeight: 'bold' },
+
+  footer: { borderTopWidth: 1, borderColor: '#ddd', paddingTop: 16, marginTop: 16 },
+  discount: { color: 'green', marginTop: 4 },
+  total: { fontWeight: 'bold', fontSize: 18, marginVertical: 8 },
+
   checkoutBtn: {
     backgroundColor: '#007bff',
-    padding: 12,
-    borderRadius: 8,
+    padding: 14,
+    borderRadius: 10,
     alignItems: 'center',
+    marginTop: 8,
   },
   checkoutText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
 });

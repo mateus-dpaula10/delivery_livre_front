@@ -3,9 +3,6 @@ import api from "../../services/api";
 import { Company } from "../../types/Store";
 import { useIsFocused } from "@react-navigation/native";
 import { Alert, Button, FlatList, Image, Share, StyleSheet, Text, TextInput, View } from "react-native";
-import * as ImagePicker from "expo-image-picker";
-import { Picker } from "@react-native-picker/picker";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 
 type Banner = {
   id?: number;

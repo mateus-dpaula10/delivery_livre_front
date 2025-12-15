@@ -2,13 +2,13 @@ import { Home, ShoppingCart, Truck, User, ClipboardList, ClipboardCheck, Users }
 
 export const sidebarOptions: Record<string, { label: string; screen: string; icon: any }[]> = {
     client: [
-        { label: 'Lojas', screen: 'CustomerStores', icon: ClipboardList },
+        { label: 'Lojas', screen: 'CustomerCategories', icon: ClipboardList },
         { label: 'Carrinho', screen: 'ClientCart', icon: ShoppingCart },
         { label: 'Meus Pedidos', screen: 'ClientOrders', icon: ClipboardCheck },
         { label: 'Perfil', screen: 'ClientProfile', icon: User }
     ],
     store: [
-        { label: 'Painel', screen: 'AdminDashboard', icon: Home },
+        { label: 'Painel', screen: 'StoreDashboard', icon: Home },
         { label: 'Produtos', screen: 'StoreProducts', icon: ShoppingCart },
         { label: 'Pedidos Recebidos', screen: 'StoreOrders', icon: Truck },
         { label: 'Motoristas Parceiros', screen: 'StoreDrivers', icon: Users },

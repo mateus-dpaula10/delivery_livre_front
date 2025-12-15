@@ -2,33 +2,39 @@
   "expo": {
     "name": "Delivery Livre",
     "slug": "delivery-livre-v2",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/Delivery Livre - Logo vertical - branco.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
+
     "splash": {
-      "image": "./assets/splash-icon.png",
+      "image": "./assets/Delivery Livre - Logo vertical - branco.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
+
     "ios": {
       "supportsTablet": true
     },
+
     "android": {
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
-      },
+      "package": "com.mateus.dpaula10.DeliveryLivre",
+      "versionCode": 5,
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "softwareKeyboardLayoutMode": "pan",
       "windowSoftInputMode": "adjustResize",
-      "package": "com.mateus.dpaula10.DeliveryLivre"
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/Delivery Livre - Logo vertical - branco.png",
+        "backgroundColor": "#ffffff"
+      }
     },
+
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/Delivery Livre - Logo vertical - branco.png"
     },
+
     "extra": {
       "eas": {
         "projectId": "8976a00a-b2dd-4c3f-a4bd-a18706f6ff69"

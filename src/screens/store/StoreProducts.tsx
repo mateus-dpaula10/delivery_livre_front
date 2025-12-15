@@ -1,235 +1,86 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, Image, FlatList, ScrollView, StyleSheet, useWindowDimensions, Platform, KeyboardAvoidingView, Alert } from 'react-native';
-import LayoutWithSidebar from '../../components/LayoutWithSidebar';
-import api from '../../services/api';
-import { Product } from '../../types/Product';
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  Image,
+  FlatList,
+  StyleSheet,
+  Alert,
+  KeyboardAvoidingView,
+  ActivityIndicator,
+} from 'react-native';
+
 import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as FileSystem from 'expo-file-system';
 import { Picker } from '@react-native-picker/picker';
 import { useIsFocused } from '@react-navigation/native';
 
-const base64toBlob = (base64: string, mime: string) => {
-  const byteCharacters = atob(base64);
-  const byteNumbers = new Array(byteCharacters.length);
-  for (let i = 0; i < byteCharacters.length; i++) {
-    byteNumbers[i] = byteCharacters.charCodeAt(i);
-  }
-  const byteArray = new Uint8Array(byteNumbers);
-  return new Blob([byteArray], { type: mime });
-};
+import api from '../../services/api';
+import { Product } from '../../types/Product';
 
+/* =====================
+   TYPES
+===================== */
 type ImageFile = {
   uri: string;
   name: string;
   type: string;
-  file?: File;
 };
 
+type Category = {
+  id: number;
+  name: string;
+};
+
+const IMAGE_BASE_URL = 'https://apideliverylivre.com.br/storage/';
+
 export default function StoreProducts() {
+  const isFocused = useIsFocused();
+
+  /* =====================
+     STATES
+  ===================== */
+  const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState('');
   const [stock, setStock] = useState('');
-  const [images, setImages] = useState<ImageFile[]>([]);
-  const [existingImages, setExistingImages] = useState<string[]>([]);
-  const [category, setCategory] = useState('');
-  const [categories, setCategories] = useState<string[]>([]);
   const [status, setStatus] = useState<'ativo' | 'em_falta' | 'oculto'>('ativo');
-  const [variations, setVariations] = useState<{ type: string; value: string }[]>([]);
-  const [variationType, setVariationType] = useState('');
-  const [variationValue, setVariationValue] = useState('');
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
+
+  const [selectedCategory, setSelectedCategory] = useState<number>(0);
+  const [newCategory, setNewCategory] = useState('');
+
+  const [existingImages, setExistingImages] = useState<string[]>([]);
+  const [images, setImages] = useState<ImageFile[]>([]);
+
   const [editingId, setEditingId] = useState<number | null>(null);
 
-  const pickImage = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      quality: 1,
-      base64: Platform.OS === 'web' ? true : false,
-    });
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
 
-    if (!result.canceled) {
-      const asset = result.assets[0];
-
-      if (Platform.OS === 'web' && asset.base64) {
-        const mimeType = asset.uri?.startsWith('data:') ? asset.uri.split(';')[0].replace('data:', '') : 'image/jpeg';
-        const blob = base64toBlob(asset.base64, mimeType);
-        const file = new File([blob], asset.fileName || `photo_${Date.now()}.jpg`, { type: mimeType });
-
-        setImages((prev) => [
-          ...prev,
-          { uri: URL.createObjectURL(blob), name: file.name, type: file.type, file },
-        ]);
-      } else {
-        let localUri = asset.uri;
-        if (Platform.OS !== 'web' && asset.uri.startsWith('content://')) {
-          const fileName = asset.uri.split('/').pop();
-          const destPath = `${(FileSystem as any).cacheDirectory}${fileName}`;
-          await (FileSystem as any).copyAsync({ from: asset.uri, to: destPath });
-          localUri = destPath;
-        }
-
-        const ext = localUri.split('.').pop()?.toLowerCase() || 'jpg';
-        let mimeType = 'image/jpeg';
-        if (ext === 'png') mimeType = 'image/png';
-
-        setImages((prev) => [
-          ...prev,
-          { uri: localUri, name: asset.fileName || `photo_${Date.now()}.${ext}`, type: mimeType },
-        ]);
-      }
-    }
-  };
-
-  const resetForm = () => {
-    setName('');
-    setDescription('');
-    setPrice('');
-    setStock('');
-    setCategory('');
-    setStatus('ativo');
-    setVariations([]);
-    setImages([]);
-    setExistingImages([]);
-    setEditingId(null);
-  };
-
-  const handleAddProduct = async () => {
-    const token = await AsyncStorage.getItem('@token');
-    if (!token) return;
-
-    if (!name.trim()) {
-      Alert.alert("O nome do produto é obrigatório");
-      return;
-    }
-
-    if (!category.trim()) {
-      Alert.alert("Selecione ou digite uma categoria");
-      return;
-    }
-
-    if (!price) {
-      Alert.alert("Digite um preço válido");
-      return;
-    }
-
-    if (!stock || isNaN(Number(stock))) {
-      Alert.alert("Digite a quantidade em estoque");
-      return;
-    }
-
-    const formData = new FormData();
-    formData.append('name', name);
-    formData.append('description', description);
-    formData.append('price', price);
-    formData.append('stock_quantity', stock);
-    formData.append('category', category);
-    formData.append('status', status);
-
-    variations.forEach((v, index) => {
-      formData.append(`variations[${index}][type]`, v.type);
-      formData.append(`variations[${index}][value]`, v.value);
-    });
-
-    existingImages.forEach(path => formData.append('existing_images[]', path));
-    images.forEach(image => {
-      if (Platform.OS === 'web' && image.file) {
-        formData.append('images[]', image.file, image.name);
-      } else {
-        formData.append('images[]', { uri: image.uri, name: image.name, type: image.type } as any);
-      }
-    });
-
-    setSaving(true);
-    try {
-      if (editingId) {
-        const response = await api.post(`/products/${editingId}?_method=PUT`, formData, {
-          headers: { 'Content-Type': 'multipart/form-data', Authorization: `Bearer ${token}` },
-        });
-        setProducts((prev) => prev.map(p => (p.id === editingId ? response.data : p)));
-        Alert.alert("Produto atualizado com sucesso!");
-      } else {
-        const response = await api.post('/products', formData, {
-          headers: { 'Content-Type': 'multipart/form-data', Authorization: `Bearer ${token}` },
-        });
-        setProducts((prev) => [...prev, response.data]);
-          Alert.alert("Produto cadastrado com sucesso!");
-      }
-      resetForm();
-    } catch (err: any) {
-      console.error(err);
-      Alert.alert('Erro ao cadastrar/atualizar produto. Tente novamente.');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleEditProduct = (product: Product) => {
-    setEditingId(product.id);
-    setName(product.name);
-    setDescription(product.description);
-    setPrice(String(product.price));
-    setStock(String(product.stock_quantity));
-    setCategory(product.category || '');
-    setStatus(product.status as any || 'ativo');
-    setVariations(product.variations || []);
-    setExistingImages(product.images.map(img => img.image_path));
-    setImages([]);
-  };
-
-  const handleDeleteProduct = async (id: number) => {
-    const token = await AsyncStorage.getItem('@token');
-    if (!token) return;
-
-    try {
-      await api.delete(`/products/${id}`, { headers: { Authorization: `Bearer ${token}` } });
-      setProducts((prev) => prev.filter(p => p.id !== id));
-      Alert.alert("Produto excluído com sucesso!");
-    } catch (err) {
-      console.error(err);
-      Alert.alert('Erro ao excluir produto. Tente novamente.');
-    }
-  };
-
-  useEffect(() => {
-    if (categories.length === 1 && !category) {
-      setCategory(categories[0]);
-    }
-  }, [categories, category])
-
+  /* =====================
+     LOADERS
+  ===================== */
   const loadProducts = async () => {
     setLoading(true);
-    try {
-      const res = await api.get('/products');
-      if (Array.isArray(res.data)) {
-        setProducts(res.data);
-      } else {
-        setProducts([]);
-      }
-    } catch (err: any) {
-      Alert.alert('Aviso', 'Não foi encontrado nenhum produto no momento.');
-      setProducts([]);
-    } finally {
-      setLoading(false);
-    }
+    const res = await api.get('/products');
+    setProducts(res.data || []);
+    setLoading(false);
   };
 
   const loadCategories = async () => {
     const token = await AsyncStorage.getItem('@token');
     if (!token) return;
-    try {
-      const res = await api.get('/categories', { headers: { Authorization: `Bearer ${token}` } });
-      setCategories(res.data.map((c: any) => c.name));
-    } catch (err) {
-      console.error(err);
-    }
-  };
 
-  const isFocused = useIsFocused();
+    const res = await api.get('/categories', {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    setCategories(res.data);
+  };
 
   useEffect(() => {
     if (isFocused) {
@@ -238,134 +89,283 @@ export default function StoreProducts() {
     }
   }, [isFocused]);
 
-  const getImageUrl = (path: string) => `https://apideliverylivre.com.br/storage/${path}`;
-  const { width } = useWindowDimensions();
-  const numColumns = width < 500 ? 1 : width < 900 ? 2 : 3;
+  /* =====================
+     IMAGE PICKER
+  ===================== */
+  const pickImage = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 1,
+    });
 
-  return (    
-    <KeyboardAvoidingView
-      style={{ flex: 1 }}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 80 : 0}
-    >
+    if (result.canceled) return;
+
+    const asset = result.assets[0];
+
+    setImages(prev => [
+      ...prev,
+      {
+        uri: asset.uri,
+        name: asset.fileName || `photo_${Date.now()}.jpg`,
+        type: asset.type || 'image/jpeg',
+      },
+    ]);
+  };
+
+  /* =====================
+     RESET
+  ===================== */
+  const resetForm = () => {
+    setName('');
+    setDescription('');
+    setPrice('');
+    setStock('');
+    setStatus('ativo');
+    setSelectedCategory(0);
+    setNewCategory('');
+    setImages([]);
+    setExistingImages([]);
+    setEditingId(null);
+  };
+
+  /* =====================
+     SAVE
+  ===================== */
+  const handleSave = async () => {
+    if (!name.trim()) {
+      Alert.alert('Erro', 'Nome é obrigatório');
+      return;
+    }
+
+    const token = await AsyncStorage.getItem('@token');
+    if (!token) return;
+
+    const formData = new FormData();
+    formData.append('name', name);
+    formData.append('description', description);
+    formData.append('price', price);
+    formData.append('stock_quantity', stock);
+    formData.append('status', status);
+
+    if (newCategory.trim()) {
+      formData.append('category', newCategory.trim());
+    } else if (selectedCategory > 0) {
+      formData.append('category_id', String(selectedCategory));
+    }
+
+    existingImages.forEach(img =>
+      formData.append('existing_images[]', img)
+    );
+
+    images.forEach(img =>
+      formData.append(
+        'images[]',
+        {
+          uri: img.uri,
+          name: img.name,
+          type: img.type,
+        } as any
+      )
+    );
+
+    setSaving(true);
+
+    try {
+      if (editingId) {
+        await api.post(`/products/${editingId}?_method=PUT`, formData, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'multipart/form-data',
+          },
+        });
+      } else {
+        await api.post('/products', formData, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'multipart/form-data',
+          },
+        });
+      }
+
+      resetForm();
+      loadProducts();
+      loadCategories();
+    } catch {
+      Alert.alert('Erro', 'Erro ao salvar produto');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  /* =====================
+     EDIT / DELETE
+  ===================== */
+  const handleEdit = (product: Product) => {
+    setEditingId(product.id);
+    setName(product.name);
+    setDescription(product.description || '');
+    setPrice(String(product.price));
+    setStock(String(product.stock_quantity));
+    setStatus(product.status);
+
+    setSelectedCategory(product.category_id ?? 0);
+    setNewCategory('');
+
+    setExistingImages(product.images.map(i => i.image_path));
+    setImages([]);
+  };
+
+  const handleDeleteProduct = (id: number) => {
+    Alert.alert(
+      'Excluir produto',
+      'Tem certeza que deseja excluir este produto?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Excluir',
+          style: 'destructive',
+          onPress: async () => {
+            const token = await AsyncStorage.getItem('@token');
+            if (!token) return;
+
+            try {
+              setLoading(true);
+
+              await api.delete(`/products/${id}`, {
+                headers: { Authorization: `Bearer ${token}` },
+              });
+
+              setProducts(prev => prev.filter(p => p.id !== id));
+
+              if (editingId === id) {
+                resetForm();
+              }
+            } catch {
+              Alert.alert('Erro', 'Erro ao excluir produto');
+            } finally {
+              setLoading(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  /* =====================
+     RENDER
+  ===================== */
+  return (
+    <KeyboardAvoidingView style={{ flex: 1 }}>
+      {loading && (
+        <View style={styles.loaderOverlay}>
+          <ActivityIndicator size="large" color="#fff" />
+        </View>
+      )}
+
       <FlatList
-        style={{ padding: 16 }}
         data={products}
-        numColumns={numColumns}
-        columnWrapperStyle={numColumns > 1 ? { justifyContent: 'space-between' } : undefined}
-        keyExtractor={(item) => item.id.toString()}
+        keyExtractor={item => item.id.toString()}
         ListHeaderComponent={
-          <>
-            <Text style={styles.title}>Cadastro de produto</Text>
-    
-            <TextInput style={styles.input} placeholder="Nome do produto" value={name} onChangeText={setName} />
-    
-            <Text style={styles.label}>Categoria</Text>
-            <Picker
-                selectedValue={category}
-                onValueChange={(value) => setCategory(value)}
-                style={{ borderWidth: 1, borderColor: '#ccc', borderRadius: 4 }}
-            >
-                {categories.map((cat, i) => (
-                    <Picker.Item key={i} label={cat} value={cat} />
-                ))}
-            </Picker>
-    
-            <TextInput
-                placeholder="Ou digite nova categoria"
-                value={category}
-                onChangeText={setCategory}
-                style={{ borderWidth: 1, borderColor: '#ccc', borderRadius: 4, padding: 8, marginTop: 4 }}
-            />
-    
-            <Text style={styles.label}>Status</Text>
-            <View style={styles.row}>
-                {['ativo', 'em_falta', 'oculto'].map(opt => (
-                    <TouchableOpacity key={opt} style={[styles.button, status === opt && styles.buttonSelected]} onPress={() => setStatus(opt as any)}>
-                    <Text style={styles.buttonText}>{opt}</Text>
-                    </TouchableOpacity>
-                ))}
-            </View>
-    
-            <Text style={styles.label}>Variações</Text>
-            <View style={styles.row}>
-                <TextInput style={[styles.input, { flex: 1 }]} placeholder="Tipo" value={variationType} onChangeText={setVariationType} />
-                <TextInput style={[styles.input, { flex: 1 }]} placeholder="Valor" value={variationValue} onChangeText={setVariationValue} />
-                <TouchableOpacity style={styles.button} onPress={() => {
-                    if (variationType && variationValue) {
-                    setVariations([...variations, { type: variationType, value: variationValue }]);
-                    setVariationType('');
-                    setVariationValue('');
-                    }
-                }}>
-                    <Text>+</Text>
-                </TouchableOpacity>
-            </View>
-    
-            {variations.length > 0 && variations.map((v, i) => (
-                <View key={i} style={styles.row}>
-                    <Text>{v.type}: {v.value}</Text>
-                    <TouchableOpacity onPress={() => setVariations(variations.filter((_, idx) => idx !== i))}>
-                    <Text style={{ color: 'red', marginLeft: 8 }}>X</Text>
-                    </TouchableOpacity>
-                </View>
-            ))}
-    
-            <TextInput style={[styles.input, { height: 60 }]} placeholder="Descrição" value={description} multiline numberOfLines={3} onChangeText={setDescription} />
+          <View style={styles.card}>
+            <Text style={styles.title}>
+              {editingId ? 'Editar Produto' : 'Novo Produto'}
+            </Text>
+
+            <TextInput style={styles.input} placeholder="Nome" value={name} onChangeText={setName} />
+            <TextInput style={styles.input} placeholder="Descrição" value={description} onChangeText={setDescription} />
             <TextInput style={styles.input} placeholder="Preço" keyboardType="numeric" value={price} onChangeText={setPrice} />
             <TextInput style={styles.input} placeholder="Estoque" keyboardType="numeric" value={stock} onChangeText={setStock} />
-    
-            <TouchableOpacity style={styles.button} onPress={pickImage}>
-                <Text>Selecionar imagem</Text>
-            </TouchableOpacity>
-    
-            {existingImages.map((imgPath, index) => (
-                <View key={`old-${index}`} style={{ marginTop: 8, position: 'relative' }}>
-                    <Image source={{ uri: getImageUrl(imgPath) }} style={{ width: 100, height: 100 }} />
-                    <TouchableOpacity style={styles.deleteButton} onPress={() => setExistingImages(prev => prev.filter((_, i) => i !== index))}>
-                    <Text style={{ color: 'white' }}>X</Text>
+
+            <Picker selectedValue={status} onValueChange={setStatus}>
+              <Picker.Item label="Ativo" value="ativo" />
+              <Picker.Item label="Em falta" value="em_falta" />
+              <Picker.Item label="Oculto" value="oculto" />
+            </Picker>
+
+            <Picker selectedValue={selectedCategory} onValueChange={setSelectedCategory}>
+              <Picker.Item label="Selecione uma categoria" value={0} />
+              {categories.map(cat => (
+                <Picker.Item key={cat.id} label={cat.name} value={cat.id} />
+              ))}
+            </Picker>
+
+            {selectedCategory === 0 && (
+              <TextInput
+                style={styles.input}
+                placeholder="Nova categoria"
+                value={newCategory}
+                onChangeText={setNewCategory}
+              />
+            )}
+
+            {/* 🔥 IMAGENS COM ❌ APENAS NO EDIT */}
+            <View style={styles.imageRow}>
+              {existingImages.map((img, i) => (
+                <View key={i} style={styles.imageBox}>
+                  <Image source={{ uri: IMAGE_BASE_URL + img }} style={styles.image} />
+
+                  {editingId && (
+                    <TouchableOpacity
+                      style={styles.removeBtn}
+                      onPress={() =>
+                        setExistingImages(prev =>
+                          prev.filter((_, idx) => idx !== i)
+                        )
+                      }
+                    >
+                      <Text style={styles.removeText}>X</Text>
                     </TouchableOpacity>
+                  )}
                 </View>
-            ))}
-    
-            {images.map((img, index) => (
-                <View key={`new-${index}`} style={{ marginTop: 8, position: 'relative' }}>
-                    <Image source={{ uri: img.uri }} style={{ width: 100, height: 100 }} />
-                    <TouchableOpacity style={styles.deleteButton} onPress={() => setImages(prev => prev.filter((_, i) => i !== index))}>
-                    <Text style={{ color: 'white' }}>X</Text>
+              ))}
+
+              {images.map((img, i) => (
+                <View key={`new-${i}`} style={styles.imageBox}>
+                  <Image source={{ uri: img.uri }} style={styles.image} />
+
+                  {editingId && (
+                    <TouchableOpacity
+                      style={styles.removeBtn}
+                      onPress={() =>
+                        setImages(prev =>
+                          prev.filter((_, idx) => idx !== i)
+                        )
+                      }
+                    >
+                      <Text style={styles.removeText}>X</Text>
                     </TouchableOpacity>
+                  )}
                 </View>
-            ))}
-    
-            <TouchableOpacity style={styles.saveButton} onPress={handleAddProduct} disabled={saving}>
-                <Text style={{ color: 'white' }}>Salvar produto</Text>
+              ))}
+            </View>
+
+            <TouchableOpacity style={styles.imageBtn} onPress={pickImage}>
+              <Text>Selecionar imagem</Text>
             </TouchableOpacity>
-    
-            {loading && <Text style={{ marginTop: 16 }}>Carregando produtos...</Text>}
-          </>
+
+            <TouchableOpacity style={styles.saveBtn} onPress={handleSave} disabled={saving}>
+              {saving ? <ActivityIndicator color="#fff" /> : <Text style={{ color: '#fff' }}>Salvar</Text>}
+            </TouchableOpacity>
+          </View>
         }
         renderItem={({ item }) => (
           <View style={styles.productCard}>
-            {item.images && item.images.length > 0 ? (
-              <Image source={{ uri: getImageUrl(item.images[0].image_path) }} style={{ width: 100, height: 100 }} />
-            ) : <Text>Sem imagem</Text>}
-            <Text style={{ fontWeight: 'bold' }}>{item.name}</Text>
-            <Text>{item.description}</Text>
-            <Text>Preço: R$ {Number(item.price).toFixed(2).replace('.', ',')}</Text>
-            <Text>Estoque: {item.stock_quantity}</Text>
-            <Text>Categoria: {item.category}</Text>
-            <Text>Status: {item.status}</Text>
-
-            {item.variations && item.variations.length > 0 && (
-              <Text>Variações: {item.variations.map(v => `${v.type}: ${v.value}`).join(', ')}</Text>
+            {item.images?.[0] && (
+              <Image
+                source={{ uri: IMAGE_BASE_URL + item.images[0].image_path }}
+                style={styles.listImage}
+              />
             )}
 
-            <View style={styles.row}>
-              <TouchableOpacity style={[styles.button, { backgroundColor: 'blue' }]} onPress={() => handleEditProduct(item)}>
-                <Text style={{ color: 'white' }}>Editar</Text>
+            <Text style={styles.productName}>{item.name}</Text>
+
+            <View style={styles.actions}>
+              <TouchableOpacity style={styles.editBtn} onPress={() => handleEdit(item)}>
+                <Text style={styles.actionText}>Editar</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={[styles.button, { backgroundColor: 'red' }]} onPress={() => handleDeleteProduct(item.id)}>
-                <Text style={{ color: 'white' }}>Excluir</Text>
+
+              <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDeleteProduct(item.id)}>
+                <Text style={styles.actionText}>Excluir</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -375,15 +375,48 @@ export default function StoreProducts() {
   );
 }
 
+/* =====================
+   STYLES
+===================== */
 const styles = StyleSheet.create({
-  title: { fontSize: 20, fontWeight: 'bold', marginBottom: 8 },
-  label: { marginTop: 8, fontWeight: 'bold' },
-  input: { borderWidth: 1, borderColor: '#ccc', borderRadius: 4, padding: 8, marginTop: 4 },
-  button: { padding: 8, borderWidth: 1, borderColor: '#ccc', borderRadius: 4, marginRight: 4, marginTop: 4 },
-  buttonSelected: { backgroundColor: '#007bff', color: 'white' },
-  buttonText: { color: 'black' },
-  row: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', marginTop: 4 },
-  deleteButton: { position: 'absolute', top: 0, right: 0, backgroundColor: 'red', padding: 4, borderRadius: 4 },
-  saveButton: { backgroundColor: 'green', padding: 12, borderRadius: 4, alignItems: 'center', marginTop: 8 },
-  productCard: { borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 8, marginVertical: 8, flex: 1 }
+  card: { backgroundColor: '#fff', padding: 16, margin: 16, borderRadius: 10 },
+  title: { fontSize: 18, fontWeight: 'bold', marginBottom: 12 },
+  input: { borderWidth: 1, borderColor: '#ddd', borderRadius: 6, padding: 10, marginTop: 8 },
+  imageBtn: { marginTop: 10, padding: 10, borderWidth: 1, borderColor: '#ccc', borderRadius: 6, alignItems: 'center' },
+  saveBtn: { marginTop: 16, backgroundColor: '#28a745', padding: 14, borderRadius: 8, alignItems: 'center' },
+
+  imageRow: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 10 },
+  imageBox: { position: 'relative', marginRight: 8, marginBottom: 8 },
+  image: { width: 90, height: 90, borderRadius: 6 },
+
+  removeBtn: {
+    position: 'absolute',
+    top: 2,
+    right: 2,
+    backgroundColor: 'red',
+    borderRadius: 10,
+    paddingHorizontal: 6,
+  },
+  removeText: { color: '#fff', fontWeight: 'bold' },
+
+  productCard: { backgroundColor: '#fff', margin: 16, padding: 12, borderRadius: 8 },
+  listImage: { width: '100%', height: 160, borderRadius: 8, marginBottom: 8 },
+  productName: { fontWeight: 'bold', fontSize: 16 },
+
+  actions: { flexDirection: 'row', marginTop: 10 },
+  editBtn: { backgroundColor: '#007bff', padding: 8, borderRadius: 6, marginRight: 6, flex: 1 },
+  deleteBtn: { backgroundColor: '#dc3545', padding: 8, borderRadius: 6, flex: 1 },
+  actionText: { color: '#fff', textAlign: 'center' },
+
+  loaderOverlay: {
+    position: 'absolute',
+    zIndex: 999,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 });

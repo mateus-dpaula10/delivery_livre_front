@@ -3,25 +3,27 @@ import {
   View,
   Text,
   TextInput,
-  Button,
+  TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
   TouchableWithoutFeedback,
   Keyboard,
   StyleSheet,
   Image,
-  TouchableOpacity,
-  Alert
+  Alert,
+  ActivityIndicator,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
+import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
+
 import { useAuth } from "../../contexts/AuthContext";
 import api from "../../services/api";
-import logo from "../../../assets/Delivery Livre - Logo horizontal - azul  sem fundo.png"; 
-import { Ionicons } from "@expo/vector-icons";
+import logo from "../../../assets/Delivery Livre - Logo horizontal - branco sem fundo.png";
 
 export default function LoginScreen() {
   const { login } = useAuth();
-  const navigation = useNavigation();
+  const navigation = useNavigation<any>();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -30,7 +32,7 @@ export default function LoginScreen() {
 
   const handleLogin = async () => {
     if (!email || !password) {
-      Alert.alert("Campos obrigatórios", "Preencha todos os campos");
+      Alert.alert("Campos obrigatórios", "Preencha email e senha");
       return;
     }
 
@@ -38,15 +40,14 @@ export default function LoginScreen() {
     try {
       const response = await api.post("/login", { email, password });
       const { user, access_token } = response.data;
-      
+
       if (!user || !access_token) {
-        throw new Error("Resposta da API está incompleta.");
+        throw new Error("Resposta inválida da API");
       }
 
       await login(user, access_token);
     } catch (err: any) {
-      console.log(err.response?.data || err.message);
-      Alert.alert("Erro ao logar", "Credenciais inválidas");
+      Alert.alert("Erro ao entrar", "Email ou senha inválidos");
     } finally {
       setLoading(false);
     }
@@ -59,51 +60,86 @@ export default function LoginScreen() {
     >
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
         <View style={styles.container}>
-          <Image source={logo} style={styles.logo} resizeMode="contain" />          
+          
+          {/* HEADER */}
+          <LinearGradient
+            colors={["#1E88E5", "#1565C0"]}
+            style={styles.header}
+          >
+            <Image source={logo} style={styles.logo} resizeMode="contain" />
 
-          <View style={styles.passwordContainer}>
-            <TextInput
-              style={styles.input}
-              placeholder="Email"
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
-              autoCapitalize="none"
-            />
-          </View>
+            <Text style={styles.title}>Bem-vindo de volta 👋</Text>
+            <Text style={styles.subtitle}>
+              Entre para continuar seus pedidos
+            </Text>
+          </LinearGradient>
 
-          <View style={styles.passwordContainer}>
-            <TextInput
-              style={styles.input}
-              placeholder="Senha"
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry={!showPassword}
-            />
-            <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
-              <Ionicons
-                name={showPassword ? "eye-off" : "eye"}
-                size={20}
-                color="#555"
-                style={{ marginHorizontal: 8 }}
+          {/* FORM */}
+          <View style={styles.form}>
+            {/* EMAIL */}
+            <View style={styles.inputContainer}>
+              <Ionicons name="mail-outline" size={20} color="#999" />
+              <TextInput
+                style={styles.input}
+                placeholder="Email"
+                placeholderTextColor="#999"
+                value={email}
+                onChangeText={setEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
               />
-            </TouchableOpacity>
-          </View>
+            </View>
 
-          <View style={styles.buttonContainer}>
-            <Button
-              title={loading ? "Carregando..." : "Entrar"}
+            {/* PASSWORD */}
+            <View style={styles.inputContainer}>
+              <Ionicons name="lock-closed-outline" size={20} color="#999" />
+              <TextInput
+                style={styles.input}
+                placeholder="Senha"
+                placeholderTextColor="#999"
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry={!showPassword}
+              />
+              <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
+                <Ionicons
+                  name={showPassword ? "eye-off-outline" : "eye-outline"}
+                  size={20}
+                  color="#999"
+                />
+              </TouchableOpacity>
+            </View>
+
+            {/* ESQUECI SENHA */}
+            <TouchableOpacity
+              style={styles.forgot}
+              onPress={() => navigation.navigate("ForgotPasswordScreen")}
+            >
+              <Text style={styles.forgotText}>Esqueci minha senha</Text>
+            </TouchableOpacity>
+
+            {/* BUTTON */}
+            <TouchableOpacity
+              style={styles.button}
               onPress={handleLogin}
               disabled={loading}
-            />
-          </View>
+              activeOpacity={0.8}
+            >
+              {loading ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.buttonText}>Entrar</Text>
+              )}
+            </TouchableOpacity>
 
-          <Text
-            style={styles.registerText}
-            onPress={() => navigation.navigate("Register" as never)}
-          >
-            Não tem conta? Cadastre-se
-          </Text>
+            {/* REGISTER */}
+            <TouchableOpacity onPress={() => navigation.navigate("Register")}>
+              <Text style={styles.registerText}>
+                Não tem conta?{" "}
+                <Text style={styles.registerBold}>Cadastre-se</Text>
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </TouchableWithoutFeedback>
     </KeyboardAvoidingView>
@@ -113,53 +149,92 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: "#f9f9f9",
+  },
+
+  header: {
+    height: 300,
     justifyContent: "center",
+    alignItems: "center",
     paddingHorizontal: 24,
-    backgroundColor: "#f0f0f0",
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
   },
+
   logo: {
-    width: "100%",
-    height: 240,
-    alignSelf: "center",
-    marginBottom: 0,
-  },
-  inputContainer: {
-    borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 8,
-    paddingHorizontal: 12,
+    width: 400,
+    height: 80,
     marginBottom: 16,
-    backgroundColor: "#fff",
   },
-  input: {
-    flex: 1,                  
-    height: 50,
-    borderWidth: 0,           
-    paddingHorizontal: 8,     
-    backgroundColor: "#fff",
+
+  title: {
+    fontSize: 22,
+    fontWeight: "bold",
+    color: "#fff",
   },
-  passwordContainer: {
+
+  subtitle: {
+    fontSize: 14,
+    color: "#E3F2FD",
+    marginTop: 4,
+  },
+
+  form: {
+    flex: 1,
+    padding: 24,
+    marginTop: -40,
+  },
+
+  inputContainer: {
     flexDirection: "row",
     alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    marginBottom: 16,
     backgroundColor: "#fff",
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    height: 54,
+    marginBottom: 16,
+    elevation: 2,
   },
-  showPasswordButton: {
-    marginLeft: 8,
+
+  input: {
+    flex: 1,
+    marginLeft: 12,
+    fontSize: 16,
+    color: "#333",
   },
-  showPasswordText: {
-    color: "#007bff",
+
+  forgot: {
+    alignItems: "flex-end",
+    marginBottom: 24,
+  },
+
+  forgotText: {
+    color: "#1E88E5",
     fontWeight: "500",
   },
-  buttonContainer: {
-    marginBottom: 16,
+
+  button: {
+    backgroundColor: "#1E88E5",
+    height: 54,
+    borderRadius: 16,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 24,
   },
+
+  buttonText: {
+    color: "#fff",
+    fontSize: 18,
+    fontWeight: "bold",
+  },
+
   registerText: {
     textAlign: "center",
-    color: "#007bff",
+    color: "#555",
+  },
+
+  registerBold: {
+    color: "#1E88E5",
+    fontWeight: "bold",
   },
 });
