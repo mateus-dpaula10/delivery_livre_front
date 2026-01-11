@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -41,8 +41,9 @@ type OrderItem = {
 type StoreOrder = {
   id: number;
   code: string;
-  created_at: Date;
+  created_at: string;
   status: string;
+  payment_status?: string | null;
   total: number;
   user: { name: string };
   items: OrderItem[];
@@ -50,6 +51,18 @@ type StoreOrder = {
 
 export default function StoreOrders() {
   const [orders, setOrders] = useState<StoreOrder[]>([]);
+  const [statusSelections, setStatusSelections] = useState<Record<number, string>>({});
+  const apiBase = api.defaults.baseURL
+    ? api.defaults.baseURL.replace(/\/api\/?$/, '')
+    : '';
+  const buildImageUrl = (path?: string) => (path ? `${apiBase}/storage/${path}` : '');
+  const statusOptions = [
+    { value: 'pending', label: 'pendente' },
+    { value: 'processing', label: 'em processamento' },
+    { value: 'completed', label: 'concluído' },
+    { value: 'canceled', label: 'cancelado' },
+    { value: 'ready_for_pickup', label: 'pronto para retirada' },
+  ];
 
   const fetchOrders = async () => {
     try {
@@ -57,7 +70,15 @@ export default function StoreOrders() {
       const response = await api.get('/orders-store', {
         headers: { Authorization: `Bearer ${token}` },
       });
-      setOrders(response.data.orders);
+      const nextOrders = response.data.orders || [];
+      setOrders(nextOrders);
+      setStatusSelections(prev => {
+        const next = { ...prev };
+        nextOrders.forEach((order: StoreOrder) => {
+          next[order.id] = order.status;
+        });
+        return next;
+      });
     } catch (err) {
       console.error(err);
       Alert.alert('Erro', 'Não foi possível carregar os pedidos');
@@ -68,28 +89,58 @@ export default function StoreOrders() {
 
   useEffect(() => {
     if (isFocused) {
-        fetchOrders();
+      fetchOrders();
     }
   }, [isFocused]);
 
-  const updateStatus = async (orderId: number, status: string) => {
+  const updateStatus = async (
+    orderId: number,
+    currentPaymentStatus: string | null,
+    nextStatus: string
+  ) => {
+    if (nextStatus === 'processing' && currentPaymentStatus === 'awaiting_confirmation') {
+      Alert.alert(
+        'Pagamento pendente',
+        'Confirme o pagamento PIX antes de iniciar o processamento.'
+      );
+      return;
+    }
+
     try {
       const token = await AsyncStorage.getItem('@token');
       await api.patch(
         `/orders-store/${orderId}/status`,
-        { status },
+        { status: nextStatus },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      Alert.alert('Sucesso', 'Pedido marcado como em processamento');
+      Alert.alert('Sucesso', 'Status atualizado');
       fetchOrders();
     } catch (err: any) {
       console.log(err);
       const message =
         err.response?.data?.message || 'Não foi possível atualizar o status do pedido';
-        Alert.alert('Erro', message);
+      Alert.alert('Erro', message);
     }
   };
-  
+
+  const confirmPixPayment = async (orderId: number, currentStatus: string) => {
+    try {
+      const token = await AsyncStorage.getItem('@token');
+      const nextStatus = currentStatus === 'awaiting_confirmation' ? 'pending' : currentStatus;
+      await api.patch(
+        `/orders-store/${orderId}/status`,
+        { status: nextStatus, payment_status: 'paid' },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      Alert.alert('Sucesso', 'Pagamento PIX confirmado.');
+      fetchOrders();
+    } catch (err: any) {
+      const message =
+        err.response?.data?.message || 'Não foi possível confirmar o pagamento PIX';
+      Alert.alert('Erro', message);
+    }
+  };
+
   const getStatusLabel = (status: string) => {
     switch (status) {
       case 'pending':
@@ -111,16 +162,31 @@ export default function StoreOrders() {
     }
   };
 
+  const getPaymentLabel = (status: string) => {
+    switch (status) {
+      case 'awaiting_confirmation':
+        return 'aguardando confirmação do pagamento (PIX)';
+      case 'pending_payment':
+        return 'pagamento na retirada';
+      case 'paid':
+        return 'pago';
+      default:
+        return status;
+    }
+  };
+
   const renderOrderItem = ({ item }: { item: OrderItem }) => (
     <View style={styles.itemContainer}>
-      {item.product.images?.[0] && (
+      {item.product.images?.[0]?.image_path ? (
         <Image
           source={{
-            uri: `https://apideliverylivre.com.br/storage/${item.product.images[0].image_path}`,
+            uri: buildImageUrl(item.product.images[0].image_path),
           }}
           style={styles.itemImage}
           resizeMode="cover"
         />
+      ) : (
+        <View style={styles.itemImagePlaceholder} />
       )}
       <View style={styles.itemContent}>
         <Text style={styles.itemTitle}>{item.product.name}</Text>
@@ -135,43 +201,70 @@ export default function StoreOrders() {
     </View>
   );
 
-  const renderOrder = ({ item }: { item: StoreOrder }) => (
-    <View style={styles.orderContainer}>
-      <Text style={styles.orderHeader}>
-        Pedido: {item.code} | Status: {getStatusLabel(item.status)}{'\n'}
-        Cliente: {item.user.name}{'\n'}
-        Data do pedido: {new Date(item.created_at).toLocaleString()}
-      </Text>
+  const renderOrder = ({ item }: { item: StoreOrder }) => {
+    const selectedStatus = statusSelections[item.id] ?? item.status;
+    const paymentStatus = item.payment_status
+      ?? (item.status === 'awaiting_confirmation' || item.status === 'pending_payment'
+        ? item.status
+        : null);
+    const statusDisabled = selectedStatus === item.status;
+    const pixAwaitingConfirmation = paymentStatus === 'awaiting_confirmation';
 
-      <FlatList
-        data={item.items}
-        keyExtractor={(i) => i.id.toString()}
-        renderItem={renderOrderItem}
-      />
+    return (
+      <View style={styles.orderContainer}>
+        <Text style={styles.orderHeader}>
+          Pedido: {item.code} | Status: {getStatusLabel(item.status)}{'\n'}
+          Cliente: {item.user?.name || 'Cliente'}{'\n'}
+          {paymentStatus ? `Pagamento: ${getPaymentLabel(paymentStatus)}\n` : ''}
+          Data do pedido: {new Date(item.created_at).toLocaleString()}
+        </Text>
 
-      <Text style={styles.orderTotal}>
-        Total: R$ {Number(item.total).toFixed(2).replace('.', ',')}
-      </Text>
+        <FlatList
+          data={item.items}
+          keyExtractor={(i) => i.id.toString()}
+          renderItem={renderOrderItem}
+        />
 
-      {['awaiting_confirmation', 'pending_payment', 'processing'].includes(item.status) && (
-        <TouchableOpacity
-          style={styles.button}
-          onPress={() => 
-            updateStatus(
-              item.id, 
-              item.status === 'processing' ? 'ready_for_pickup' : 'processing'
-            )
-          }
-        >
-          <Text style={styles.buttonText}>
-            {item.status === 'processing'
-              ? 'Marcar como pronto para retirada'
-              : 'Confirmar pedido'}
-          </Text>
-        </TouchableOpacity>
-      )}
-    </View>
-  );
+        <Text style={styles.orderTotal}>
+          Total: R$ {Number(item.total).toFixed(2).replace('.', ',')}
+        </Text>
+
+        <View style={styles.statusRow}>
+          <Picker
+            selectedValue={selectedStatus}
+            onValueChange={(value) =>
+              setStatusSelections(prev => ({ ...prev, [item.id]: value }))
+            }
+            style={styles.statusPicker}
+            itemStyle={styles.statusPickerItem}
+          >
+            {statusOptions.map(option => (
+              <Picker.Item
+                key={option.value}
+                label={option.label}
+                value={option.value}
+              />
+            ))}
+          </Picker>
+          {pixAwaitingConfirmation && (
+            <TouchableOpacity
+              style={[styles.button, styles.pixConfirmButton]}
+              onPress={() => confirmPixPayment(item.id, item.status)}
+            >
+              <Text style={styles.buttonText}>Confirmar PIX</Text>
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity
+            style={[styles.button, statusDisabled && styles.buttonDisabled]}
+            onPress={() => updateStatus(item.id, paymentStatus, selectedStatus)}
+            disabled={statusDisabled}
+          >
+            <Text style={styles.buttonText}>Atualizar status</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  };
 
   return (
     <KeyboardAvoidingView
@@ -247,6 +340,11 @@ const styles = StyleSheet.create({
     width: 100,
     height: 100,
   },
+  itemImagePlaceholder: {
+    width: 100,
+    height: 100,
+    backgroundColor: '#f1f1f1',
+  },
   itemContent: {
     flex: 1,
     padding: 10,
@@ -272,9 +370,38 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 8,
   },
+  pixConfirmButton: {
+    backgroundColor: '#f59e0b',
+  },
+  buttonDisabled: {
+    backgroundColor: '#9ca3af',
+  },
   buttonText: {
     color: '#fff',
     fontWeight: '700',
     textAlign: 'center',
   },
+  statusRow: {
+    marginTop: 10,
+    borderTopWidth: 1,
+    borderColor: '#eee',
+    paddingTop: 10,
+  },
+  statusPicker: {
+    backgroundColor: '#f8fafc',
+  },
+  statusPickerItem: {
+    fontSize: 14,
+  },
 });
+
+
+
+
+
+
+
+
+
+
+

@@ -40,12 +40,8 @@ export default function StoreDrivers() {
     try {
       const token = await AsyncStorage.getItem('@token');
       const res = await api.get('/drivers', { headers: { Authorization: `Bearer ${token}` } });
-      if (Array.isArray(res.data)) {
-        setDrivers(res.data);
-      } else {
-        setDrivers([]);
-      }
-      setDrivers(res.data);
+      const data = Array.isArray(res.data) ? res.data : res.data?.data ?? [];
+      setDrivers(data);
     } catch (err: any) {
       if (err?.response?.status === 500) {
         setDrivers([]);
@@ -88,11 +84,13 @@ export default function StoreDrivers() {
     try {
       if (editingId) {
         const res = await api.put(`/drivers/${editingId}`, payload, { headers: { Authorization: `Bearer ${token}` } });
-        setDrivers(prev => prev.map(d => (d.id === editingId ? res.data : d)));
+        const savedDriver = res.data?.data ?? res.data?.driver ?? res.data;
+        setDrivers(prev => prev.map(d => (d.id === editingId ? savedDriver : d)));
         Alert.alert('Motorista atualizado com sucesso!');
       } else {
         const res = await api.post('/drivers', payload, { headers: { Authorization: `Bearer ${token}` } });
-        setDrivers(prev => [...prev, res.data]);
+        const savedDriver = res.data?.data ?? res.data?.driver ?? res.data;
+        setDrivers(prev => [...prev, savedDriver]);
         Alert.alert('Motorista cadastrado com sucesso!');
       }
       resetForm();
@@ -106,9 +104,9 @@ export default function StoreDrivers() {
 
   const handleEditDriver = (driver: any) => {
     setEditingId(driver.id);
-    setName(driver.name);
-    setEmail(driver.email);
-    setPassword(driver.password);
+    setName(driver.name || driver.user?.name || '');
+    setEmail(driver.email || driver.user?.email || '');
+    setPassword('');
     setPhone(driver.phone);
     setVehicle(driver.vehicle || '');
     setPlate(driver.plate || '');
@@ -245,7 +243,7 @@ export default function StoreDrivers() {
         renderItem={({ item }) => (
           <View style={styles.card}>
             <View style={{ flex: 1 }}>
-              <Text style={{ fontWeight: 'bold' }}>{item.name}</Text>
+              <Text style={{ fontWeight: 'bold' }}>{item.name || item.user?.name}</Text>
               <Text>Telefone: {item.phone}</Text>
               {item.vehicle && <Text>Veículo: {item.vehicle}</Text>}
               {item.plate && <Text>Placa: {item.plate}</Text>}

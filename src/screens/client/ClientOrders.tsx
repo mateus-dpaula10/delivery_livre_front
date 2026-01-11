@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import * as Clipboard from 'expo-clipboard';
 import {
   View,
@@ -55,6 +55,7 @@ type Order = {
   code: string;
   created_at: string;
   status: string;
+  payment_status?: string | null;
   total: number;
   store: Store;
   items: OrderItem[];
@@ -153,6 +154,17 @@ export default function ClientOrders() {
     }
   };
 
+  const getPaymentLabel = (status: string) => {
+    switch (status) {
+      case 'awaiting_confirmation':
+        return 'aguardando confirmação do pagamento (PIX)';
+      case 'pending_payment':
+        return 'pagamento na retirada';
+      default:
+        return status;
+    }
+  };
+
   const renderOrderItem = ({ item }: { item: OrderItem }) => {
     const { product, quantity, price, variations } = item;
     const outOfStock = product.stock_quantity <= 0;
@@ -199,11 +211,18 @@ export default function ClientOrders() {
     );
   };
 
-  const renderOrder = ({ item }: { item: Order }) => (
-    <View style={styles.orderContainer}>
+  const renderOrder = ({ item }: { item: Order }) => {
+    const paymentStatus = item.payment_status
+      ?? (item.status === 'awaiting_confirmation' || item.status === 'pending_payment'
+        ? item.status
+        : null);
+
+    return (
+      <View style={styles.orderContainer}>
       <Text style={styles.orderHeader}>
         Pedido: {item.code} | Status: {getStatusLabel(item.status)}{'\n'}
         Loja: {item.store.final_name}{'\n'}
+        {paymentStatus ? `Pagamento: ${getPaymentLabel(paymentStatus)}\n` : ''}
         Data do pedido: {new Date(item.created_at).toLocaleString()}
       </Text>
 
@@ -217,7 +236,7 @@ export default function ClientOrders() {
         Total: R$ {Number(item.total).toFixed(2).replace('.', ',')}
       </Text>
 
-      {item.status === 'pending' && (
+      {item.status === 'pending' && !paymentStatus && (
         <View style={{ flexDirection: 'row', marginTop: 8 }}>
           <TouchableOpacity
             style={{
@@ -229,7 +248,7 @@ export default function ClientOrders() {
             }}
             onPress={() => setSelectedPayment(prev => ({ ...prev, [item.id]: 'cash' }))}
           >
-            <Text>💵 Retirada</Text>
+            <Text>Retirada</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -241,12 +260,12 @@ export default function ClientOrders() {
             }}
             onPress={() => handleSelectPayment(item.id, 'pix', item.code)}
           >
-            <Text>📱 PIX</Text>
+            <Text>PIX</Text>
           </TouchableOpacity>
         </View>
       )}
 
-      {item.status === 'pending' && (
+      {item.status === 'pending' && !paymentStatus && (
         <View style={{ marginTop: 20, flexDirection: 'row', justifyContent: 'center' }}>
           {selectedPayment[item.id] === 'pix' && (
             <TouchableOpacity
@@ -376,12 +395,13 @@ export default function ClientOrders() {
         );
       })()}
     </View>
-  );
+    );
+  };
 
-  const updateOrderStatus = async (orderId: number, status: string) => {
+  const updateOrderStatus = async (orderId: number, paymentStatus: string) => {
     try {
       const token = await AsyncStorage.getItem('@token');
-      await api.put(`/orders-client/${orderId}/status`, { status }, {
+      await api.put(`/orders-client/${orderId}/status`, { payment_status: paymentStatus }, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -502,3 +522,7 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
   },
 });
+
+
+
+

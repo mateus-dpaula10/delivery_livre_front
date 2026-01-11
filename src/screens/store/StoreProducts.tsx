@@ -5,10 +5,8 @@ import {
   TextInput,
   TouchableOpacity,
   Image,
-  FlatList,
   StyleSheet,
   Alert,
-  KeyboardAvoidingView,
   ActivityIndicator,
 } from 'react-native';
 
@@ -16,6 +14,7 @@ import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Picker } from '@react-native-picker/picker';
 import { useIsFocused } from '@react-navigation/native';
+import { KeyboardAwareFlatList } from 'react-native-keyboard-aware-scroll-view';
 
 import api from '../../services/api';
 import { Product } from '../../types/Product';
@@ -255,123 +254,118 @@ export default function StoreProducts() {
      RENDER
   ===================== */
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }}>
-      {loading && (
-        <View style={styles.loaderOverlay}>
-          <ActivityIndicator size="large" color="#fff" />
+    <KeyboardAwareFlatList
+      data={products}
+      keyExtractor={item => item.id.toString()}
+      enableOnAndroid
+      keyboardOpeningTime={0}
+      extraScrollHeight={120}
+      contentContainerStyle={{ paddingBottom: 200 }}
+      ListHeaderComponent={
+        <View style={styles.card}>
+          <Text style={styles.title}>
+            {editingId ? 'Editar Produto' : 'Novo Produto'}
+          </Text>
+
+          <TextInput style={styles.input} placeholder="Nome" value={name} onChangeText={setName} />
+          <TextInput style={styles.input} placeholder="Descrição" value={description} onChangeText={setDescription} />
+          <TextInput style={styles.input} placeholder="Preço" keyboardType="numeric" value={price} onChangeText={setPrice} />
+          <TextInput style={styles.input} placeholder="Estoque" keyboardType="numeric" value={stock} onChangeText={setStock} />
+
+          <Picker selectedValue={status} onValueChange={setStatus}>
+            <Picker.Item label="Ativo" value="ativo" />
+            <Picker.Item label="Em falta" value="em_falta" />
+            <Picker.Item label="Oculto" value="oculto" />
+          </Picker>
+
+          <Picker selectedValue={selectedCategory} onValueChange={setSelectedCategory}>
+            <Picker.Item label="Selecione uma categoria" value={0} />
+            {categories.map(cat => (
+              <Picker.Item key={cat.id} label={cat.name} value={cat.id} />
+            ))}
+          </Picker>
+
+          {selectedCategory === 0 && (
+            <TextInput
+              style={styles.input}
+              placeholder="Nova categoria"
+              value={newCategory}
+              onChangeText={setNewCategory}
+            />
+          )}
+
+          <View style={styles.imageRow}>
+            {existingImages.map((img, i) => (
+              <View key={i} style={styles.imageBox}>
+                <Image source={{ uri: IMAGE_BASE_URL + img }} style={styles.image} />
+
+                {editingId && (
+                  <TouchableOpacity
+                    style={styles.removeBtn}
+                    onPress={() =>
+                      setExistingImages(prev =>
+                        prev.filter((_, idx) => idx !== i)
+                      )
+                    }
+                  >
+                    <Text style={styles.removeText}>X</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            ))}
+
+            {images.map((img, i) => (
+              <View key={`new-${i}`} style={styles.imageBox}>
+                <Image source={{ uri: img.uri }} style={styles.image} />
+
+                {editingId && (
+                  <TouchableOpacity
+                    style={styles.removeBtn}
+                    onPress={() =>
+                      setImages(prev =>
+                        prev.filter((_, idx) => idx !== i)
+                      )
+                    }
+                  >
+                    <Text style={styles.removeText}>X</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            ))}
+          </View>
+
+          <TouchableOpacity style={styles.imageBtn} onPress={pickImage}>
+            <Text>Selecionar imagem</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.saveBtn} onPress={handleSave} disabled={saving}>
+            {saving ? <ActivityIndicator color="#fff" /> : <Text style={{ color: '#fff' }}>Salvar</Text>}
+          </TouchableOpacity>
+        </View>
+      }
+      renderItem={({ item }) => (
+        <View style={styles.productCard}>
+          {item.images?.[0] && (
+            <Image
+              source={{ uri: IMAGE_BASE_URL + item.images[0].image_path }}
+              style={styles.listImage}
+            />
+          )}
+
+          <Text style={styles.productName}>{item.name}</Text>
+
+          <View style={styles.actions}>
+            <TouchableOpacity style={styles.editBtn} onPress={() => handleEdit(item)}>
+              <Text style={styles.actionText}>Editar</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDeleteProduct(item.id)}>
+              <Text style={styles.actionText}>Excluir</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       )}
-
-      <FlatList
-        data={products}
-        keyExtractor={item => item.id.toString()}
-        ListHeaderComponent={
-          <View style={styles.card}>
-            <Text style={styles.title}>
-              {editingId ? 'Editar Produto' : 'Novo Produto'}
-            </Text>
-
-            <TextInput style={styles.input} placeholder="Nome" value={name} onChangeText={setName} />
-            <TextInput style={styles.input} placeholder="Descrição" value={description} onChangeText={setDescription} />
-            <TextInput style={styles.input} placeholder="Preço" keyboardType="numeric" value={price} onChangeText={setPrice} />
-            <TextInput style={styles.input} placeholder="Estoque" keyboardType="numeric" value={stock} onChangeText={setStock} />
-
-            <Picker selectedValue={status} onValueChange={setStatus}>
-              <Picker.Item label="Ativo" value="ativo" />
-              <Picker.Item label="Em falta" value="em_falta" />
-              <Picker.Item label="Oculto" value="oculto" />
-            </Picker>
-
-            <Picker selectedValue={selectedCategory} onValueChange={setSelectedCategory}>
-              <Picker.Item label="Selecione uma categoria" value={0} />
-              {categories.map(cat => (
-                <Picker.Item key={cat.id} label={cat.name} value={cat.id} />
-              ))}
-            </Picker>
-
-            {selectedCategory === 0 && (
-              <TextInput
-                style={styles.input}
-                placeholder="Nova categoria"
-                value={newCategory}
-                onChangeText={setNewCategory}
-              />
-            )}
-
-            {/* 🔥 IMAGENS COM ❌ APENAS NO EDIT */}
-            <View style={styles.imageRow}>
-              {existingImages.map((img, i) => (
-                <View key={i} style={styles.imageBox}>
-                  <Image source={{ uri: IMAGE_BASE_URL + img }} style={styles.image} />
-
-                  {editingId && (
-                    <TouchableOpacity
-                      style={styles.removeBtn}
-                      onPress={() =>
-                        setExistingImages(prev =>
-                          prev.filter((_, idx) => idx !== i)
-                        )
-                      }
-                    >
-                      <Text style={styles.removeText}>X</Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-              ))}
-
-              {images.map((img, i) => (
-                <View key={`new-${i}`} style={styles.imageBox}>
-                  <Image source={{ uri: img.uri }} style={styles.image} />
-
-                  {editingId && (
-                    <TouchableOpacity
-                      style={styles.removeBtn}
-                      onPress={() =>
-                        setImages(prev =>
-                          prev.filter((_, idx) => idx !== i)
-                        )
-                      }
-                    >
-                      <Text style={styles.removeText}>X</Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-              ))}
-            </View>
-
-            <TouchableOpacity style={styles.imageBtn} onPress={pickImage}>
-              <Text>Selecionar imagem</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.saveBtn} onPress={handleSave} disabled={saving}>
-              {saving ? <ActivityIndicator color="#fff" /> : <Text style={{ color: '#fff' }}>Salvar</Text>}
-            </TouchableOpacity>
-          </View>
-        }
-        renderItem={({ item }) => (
-          <View style={styles.productCard}>
-            {item.images?.[0] && (
-              <Image
-                source={{ uri: IMAGE_BASE_URL + item.images[0].image_path }}
-                style={styles.listImage}
-              />
-            )}
-
-            <Text style={styles.productName}>{item.name}</Text>
-
-            <View style={styles.actions}>
-              <TouchableOpacity style={styles.editBtn} onPress={() => handleEdit(item)}>
-                <Text style={styles.actionText}>Editar</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDeleteProduct(item.id)}>
-                <Text style={styles.actionText}>Excluir</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        )}
-      />
-    </KeyboardAvoidingView>
+    />
   );
 }
 
